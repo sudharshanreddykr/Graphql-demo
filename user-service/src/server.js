@@ -68,8 +68,9 @@ async function start() {
     wsServer,
   );
 
-  httpServer.listen(process.env.PORT, () => {
-    console.log(`User Service Running On ${process.env.PORT}`);
+  const port = process.env.PORT || 4001;
+  httpServer.listen(port, () => {
+    console.log(`User Service Running On ${port}`);
   });
 }
 

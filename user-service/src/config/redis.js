@@ -1,18 +1,18 @@
 const { createClient } = require("redis");
 const { RedisPubSub } = require("graphql-redis-subscriptions");
 
-const redisOptions = {
-  url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
-};
+const redisUrl =
+  process.env.REDIS_URL ||
+  `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || 6379}`;
 
-const client = createClient(redisOptions);
+const client = createClient({ url: redisUrl });
 
 client.on("error", (err) => {
   console.log("Redis Error", err);
 });
 
 const pubsub = new RedisPubSub({
-  connection: redisOptions,
+  connection: redisUrl,
 });
 
 module.exports = { client, pubsub };

@@ -5,7 +5,7 @@ This document lists the GraphQL APIs exposed by each subgraph and the gateway.
 ## Gateway
 
 - HTTP endpoint: `http://localhost:4000/graphql`
-- WebSocket endpoint (proxy for subscriptions): `ws://localhost:4000/graphql`
+- WebSocket endpoint: `ws://localhost:4000/graphql`
 - Secure WebSocket endpoint (optional): `wss://localhost:4000/graphql`
 
 The gateway composes the `user`, `post`, and `feed` subgraphs using Apollo Federation.

@@ -69,8 +69,9 @@ async function start() {
     wsServer,
   );
 
-  httpServer.listen(process.env.PORT, () => {
-    console.log(`Post Service Running On ${process.env.PORT}`);
+  const port = process.env.PORT || 4002;
+  httpServer.listen(port, () => {
+    console.log(`Post Service Running On ${port}`);
   });
 }
 

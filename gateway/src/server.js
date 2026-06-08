@@ -144,6 +144,28 @@ const limiter = rateLimit({
   },
 });
 
+async function ensureGatewayIsReady(attempts = 10, intervalMs = 3000) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await gateway.load();
+      logger.info("Gateway successfully loaded federated subgraphs");
+      return;
+    } catch (err) {
+      lastError = err;
+      logger.warn(`Gateway load attempt ${attempt} failed`, {
+        error: err.message || err,
+      });
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function start() {
   const app = express();
 
