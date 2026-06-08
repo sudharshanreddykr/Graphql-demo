@@ -1,0 +1,342 @@
+query{
+    user(id:1){
+        name,
+        email
+    }
+}
+{
+    data:{
+        user:{
+            name:"",
+            email:""
+            id:""
+        }
+    }
+}
+client
+graphql server
+resolvers
+service layer
+sequelize
+db
+
+src/
+    schema
+    resolvers
+    services
+    repositories
+    models
+    middlewares
+    graphql
+
+schemas
+type User{
+    id: ID!
+    name: string!
+    email: string!
+}
+
+type Query{
+    getUser(id:1): User
+}
+
+type Mutation{
+    createUser(input: CreateUserInput): User
+}
+input CreateUserInput{
+    name: string!
+    email: string!
+}
+
+const express = require('express')
+const {ApolloServer} = require('@apollo/server');
+
+const app = express();
+
+const server =new ApolloServer({
+    typeDefs,
+    resolvers
+})
+
+why apollo?
+caching
+federation
+subscriptions
+monitoring
+schema management
+
+
+#resolvers
+const resolvers={
+    Query:{
+        user: async(, {id})=>{
+            return user.findByPk(id)
+        }
+    }
+}
+
+#resolvers arguments
+(parent, args, context, info)
+parent -> prev resolver result
+args -> query arguments
+context -> auth, db connections
+info -> query metadata
+
+#context api
+
+const server = new ApolloServer({
+    context:({req})=>{
+        const token = req.headers.authorization;
+
+        return{
+            user: VerifyJWT(token)
+        }
+    }
+})
+userCases:
+Authentication
+authorizationDB connection
+req MetaData
+
+#sequelize integration
+#. Solving N+1 using DataLoader
+
+const DataLoader = require("dataloader")
+const orderLoader = new DataLoader(async(userIds)=>{
+    const orders = await orders.findAll({
+        where:{
+            userIds: userIds
+        }
+    })
+    return userIds.map(id=>{
+        orders.filter(order=> order.userId===id)
+    })
+})
+resolver:
+orders: async(user)=>{
+    return orderLoader.load(user.id)
+}
+#DataLoader batches and caches requests per request cycle.
+
+# graphql subscriptions:
+real time updates using WebSockets
+const {PubSub} = require('graphql-subscriptions')
+const pubsub = new PubSub()
+
+type Subscription{
+    userCreated: User
+}
+
+resolver:
+Subscription:{
+    userCreated:{
+        subscribe:()=> pubsub.asyncIterator("USER_CREATED")
+    }
+}
+
+mutation resolver:
+createUser: async(, {input})=>{
+    const user = await User.create(input)
+    pubsub.publish("USER_CREATED",{userCreated:user})
+    return user
+}
+#user cases
+real time notifications
+live data feeds
+collaborative applications
+
+# GraphQL federation:
+microservices architecture for GraphQL
+multiple GraphQL services combined into a single graph
+each service defines its own schema and resolvers
+gateway service to route requests to appropriate services
+
+#monitoring and performance:
+Apollo Studio for monitoring query performance, error tracking, and usage analytics
+Apollo Engine for performance tracing and caching insights
+
+what is resolver in graphql?
+A resolver in GraphQL is a function that is responsible for fetching or computing the data for a specific field in a GraphQL query. When a client sends a query to a GraphQL server, the server uses resolvers to determine how to retrieve the requested data. Each field in the GraphQL schema has an associated resolver function that defines how to fetch the data for that field.
+
+Resolvers can perform various tasks, such as querying a database, calling an external API, or performing calculations. They receive four arguments: `parent`, `args`, `context`, and `info`. The `parent` argument contains the result of the previous resolver in the execution chain, while `args` contains the arguments passed to the field in the query. The `context` argument can be used to share information across resolvers, such as authentication details or database connections. The `info` argument provides metadata about the execution state of the query.
+
+In summary, resolvers are essential components of a GraphQL server that define how to fetch or compute the data for each field in a GraphQL query, allowing for flexible and efficient data retrieval.
+
+Explain resolver lifecycle.
+The resolver lifecycle in GraphQL involves several stages that occur when a query is executed. Here's an overview of the typical resolver lifecycle:
+
+1. **Query Parsing**: When a GraphQL query is received, it is first parsed into an Abstract Syntax Tree (AST). This step checks for syntax errors and prepares the query for execution.
+
+2. **Validation**: The parsed query is then validated against the GraphQL schema to ensure that it adheres to the defined types and structure. This step checks for issues like missing fields, incorrect types, or invalid arguments.
+
+3. **Execution**: Once the query is validated, the execution phase begins. During this phase, the resolvers are invoked to fetch the required data. The execution follows a depth-first approach, starting from the root fields and traversing down to nested fields.
+
+4. **Resolver Invocation**: Each field in the query corresponds to a resolver function. The resolver is called with four arguments: `parent`, `args`, `context`, and `info`. The resolver is responsible for fetching or computing the data for that field.
+
+5. ** Data Fetching **
+
+
+"How do you fetch data from multiple services when the client sends one query?"
+
+A strong answer:
+
+"I would use a GraphQL Gateway or BFF layer. The gateway receives the query, invokes the required microservices through resolvers, executes independent calls in parallel using Promise.all, aggregates the responses, and returns a unified result. For large-scale systems, I would use Apollo Federation so that each microservice owns its schema while the gateway composes them into a single graph. I'd also use DataLoader to avoid N+1 issues, Redis for caching, and circuit breakers/timeouts to handle downstream service failures."
+
+what is sub graph and super graph ?
+In the context of GraphQL Federation, a subgraph is an individual GraphQL service that defines its own schema and resolvers. Each subgraph is responsible for a specific domain or functionality within the overall system. For example, you might have a User Service subgraph that handles user-related data and operations, and a Product Service subgraph that manages product-related data.
+
+A supergraph, on the other hand, is the combined GraphQL schema that is created by the gateway service in a federated architecture. The gateway takes the schemas from all the subgraphs and composes them into a single unified schema that clients can query against. The supergraph allows clients to access data from multiple subgraphs through a single endpoint, while the gateway handles the routing of requests to the appropriate subgraph based on the query.
+
+In summary, a subgraph is an individual GraphQL service with its own schema and resolvers, while a supergraph is the combined schema created by the gateway that allows clients to access data from multiple subgraphs seamlessly.  
+eg:
+# User Service Subgraph
+type User {
+    id: ID!
+    name: String!
+    email: String!
+}
+
+type Query {
+    getUser(id: ID!): User
+}
+
+# Product Service Subgraph
+type Product {
+    id: ID!
+    name: String!
+    price: Float!
+}
+
+type Query {
+    getProduct(id: ID!): Product
+}
+
+# Supergraph (Gateway)
+type User {
+    id: ID!
+    name: String!
+    email: String!
+}
+
+type Product {
+    id: ID!
+    name: String!
+    price: Float!
+}
+
+type Query {
+    getUser(id: ID!): User
+    getProduct(id: ID!): Product
+}
+
+
+fundamentals
+------------------
+query,
+mutation
+subscriptions
+schemas
+typeDefs
+resolvers
+argumenrs
+variables
+fragments
+aliases
+directives
+
+query getUser($id: int!){
+    user(id: $id){
+        id
+        name
+        email
+    }
+}
+
+const resolver={
+    Query:{
+        user: async(_,{id})=>{
+            return User.findByPK(id)
+        }
+    }
+}
+
+resolver execution flow
+
+client-> graphql server -> schema validation -> resolver execution -> database/ api call-> response.
+
+
+example Query
+--------------
+{
+    user(id:1){
+        name
+        posts{
+            title
+        }
+    }
+}
+
+N+1 Query
+---------------
+user.map(user=>{
+    return Post.findAll({
+        where:{
+            userId: user.id
+        }
+    })
+})
+
+solution
+-----------------
+const dataLoader = require('dataLoader')
+const postLoader = new DataLoader(async(userIds)=>{
+    const posts = await Posts.findAll({
+        where:{
+            userId: userIds
+        }
+    })
+    return  userIds.map(id=>
+    posts.filter(posts=> post.userId===id))
+})
+resovler:
+posts:(user)=>{
+    return postLoader.load(user.id)
+}
+
+pagination
+--------------------
+offset Pagination
+{
+    user(limit:10, offset:0){
+        id
+        name
+    }
+}
+
+Cursor Pagination
+-------------------------
+{
+    user(first:10, after:"cursor"){
+        edges{
+            node{
+                id
+                name
+            }
+        }
+    }
+}
+
+JWT authentication
+--------------------
+context:
+const server = new ApolloServer({
+    schema,
+    context:({req})=>({
+        user: req.user
+    })
+})
+
+resovler:
+if(!context.user){
+    throw new Error("Unauthorised)
+}
