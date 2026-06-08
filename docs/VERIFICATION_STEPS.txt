@@ -3,17 +3,17 @@ Verification steps for subscriptions and general checks
 Prerequisites:
 - Ensure Redis is running and reachable at the configured `REDIS_HOST`/`REDIS_PORT`.
 - Ensure the gateway and all subgraphs are running:
-  - Gateway: `http://localhost:4000/graphql` (WS: `ws://localhost:4000/graphql` or optional `wss://localhost:4000/graphql`)
-  - User: `http://localhost:4001/graphql` (WS: `ws://localhost:4001/graphql`)
-  - Post: `http://localhost:4002/graphql` (WS: `ws://localhost:4002/graphql`)
-  - Feed: `http://localhost:4003/graphql` (WS: `ws://localhost:4003/graphql`)
+  - Gateway: `http://localhost:4000/graphql` (WS: `ws://localhost:4000/graphql`)
+  - User: `http://localhost:4001/graphql`
+  - Post: `http://localhost:4002/graphql`
+  - Feed: `http://localhost:4003/graphql`
 
-- To use secure WebSocket (`wss://`) from Studio, set gateway TLS environment variables:
-  - `SSL_KEY_PATH=/path/to/key.pem`
-  - `SSL_CERT_PATH=/path/to/cert.pem`
-  - optional: `SSL_PASSPHRASE=...`
-
-  Then restart the gateway.
+Database Setup:
+- Before running services, ensure your PostgreSQL database is initialized:
+  ```bash
+  psql -h localhost -U your_user -d your_db -f sql-scripts/setup.sql
+  ```
+- Alternatively, the services will fall back to an in-memory SQLite database if environment variables are not set.
 
 Simple checks:
 1. HTTP introspection (gateway):
@@ -36,13 +36,14 @@ Subscription verification (Node.js client using `graphql-ws`):
    const WebSocket = require('ws');
 
    const client = createClient({
-     url: 'wss://localhost:4000/graphql',
+     url: 'ws://localhost:4000/graphql',
      webSocketImpl: WebSocket,
    });
 
    (async () => {
      const onNext = (data) => console.log('Received', JSON.stringify(data, null, 2));
 
+     console.log('Starting subscription...');
      const dispose = client.subscribe(
        {
          query: `subscription OnPostCreated { postCreated { id title content userId } }`,
@@ -54,7 +55,11 @@ Subscription verification (Node.js client using `graphql-ws`):
        }
      );
 
-     // Keep running; in another terminal trigger a mutation to create a post
+     // To test User registration:
+     // query: `subscription OnUserRegistered { userRegistered { id name email } }`
+     
+     // To test Feed creation:
+     // query: `subscription OnFeedCreated { feedCreated { id title body userId } }`
    })();
    ```
 
@@ -63,14 +68,15 @@ Subscription verification (Node.js client using `graphql-ws`):
    node subscribe.js
    ```
 
-4. In another terminal, send a `createPost` mutation via HTTP (gateway or direct subgraph):
+4. In another terminal, trigger a mutation via the Gateway (port 4000):
    ```bash
-   curl -X POST -H "Content-Type: application/json" --data '{"query":"mutation { createPost(title:\"hello\", content:\"world\", userId:1){ id title } }"}' http://localhost:4002/graphql
+   # Create a post
+   curl -X POST -H "Content-Type: application/json" --data '{"query":"mutation { createPost(title:\"hello\", content:\"world\", userId:1){ id title } }"}' http://localhost:4000/graphql
    ```
 
-If the subscription prints the new post, end-to-end subscription is working through the gateway proxy.
+If the subscription prints the new post, end-to-end subscription is working through the gateway.
 
 Troubleshooting tips:
-- If you see no events: ensure Redis is connected (check service logs), and that the mutation publishes using `pubsub.publish(...)`.
-- If you get protocol errors: ensure the client uses `graphql-ws` protocol (Apollo Studio uses this by default when given a `ws://` URL).
-- If using Apollo Studio and subscriptions fail: check browser permissions for localhost websockets and try the Node client above to isolate issues.
+- ERR_PACKAGE_PATH_NOT_EXPORTED: If you encounter this error, ensure your import is `require('graphql-ws/use/ws')` or check the latest `graphql-ws` documentation for ESM/CJS export changes.
+- Port Conflict: Use `lsof -i :4000` to check if the port is already in use.
+- Redis Connection: Ensure all services show "Redis connected" in their logs.
