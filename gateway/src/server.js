@@ -144,17 +144,45 @@ const limiter = rateLimit({
   },
 });
 
-async function ensureGatewayIsReady(attempts = 10, intervalMs = 3000) {
+async function checkSubgraphAvailable({ name, url }) {
+  const introspectionQuery = `query __subgraphHealthCheck__ { __typename }`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query: introspectionQuery }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Subgraph ${name} at ${url} returned status ${response.status}`,
+    );
+  }
+
+  const json = await response.json();
+  if (json.errors) {
+    throw new Error(
+      `Subgraph ${name} at ${url} returned errors: ${JSON.stringify(
+        json.errors,
+      )}`,
+    );
+  }
+
+  return true;
+}
+
+async function ensureSubgraphsAvailable(attempts = 10, intervalMs = 3000) {
   let lastError;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      await gateway.load();
-      logger.info("Gateway successfully loaded federated subgraphs");
+      await Promise.all(subgraphs.map(checkSubgraphAvailable));
+      logger.info("All federated subgraphs are reachable");
       return;
     } catch (err) {
       lastError = err;
-      logger.warn(`Gateway load attempt ${attempt} failed`, {
+      logger.warn(`Subgraph availability attempt ${attempt} failed`, {
         error: err.message || err,
       });
       if (attempt < attempts) {
@@ -194,6 +222,8 @@ async function start() {
       traceId: req.traceId,
     });
   });
+
+  await ensureSubgraphsAvailable();
 
   const server = new ApolloServer({
     gateway,

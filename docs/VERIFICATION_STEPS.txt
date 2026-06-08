@@ -1,9 +1,9 @@
 Verification steps for subscriptions and general checks
 
 Prerequisites:
-- Ensure Redis is running and reachable at the configured `REDIS_HOST`/`REDIS_PORT`.
+- Ensure Redis is running and reachable via `REDIS_URL`, or via `REDIS_HOST`/`REDIS_PORT` (default: `redis://localhost:6379`).
 - Ensure the gateway and all subgraphs are running:
-  - Gateway: `http://localhost:4000/graphql` (WS: `ws://localhost:4000/graphql`)
+  - Gateway: `http://localhost:4000/graphql` (WS: `ws://localhost:4000/graphql`; secure WS: `wss://localhost:4000/graphql` when TLS is enabled)
   - User: `http://localhost:4001/graphql`
   - Post: `http://localhost:4002/graphql`
   - Feed: `http://localhost:4003/graphql`
@@ -13,13 +13,16 @@ Database Setup:
   ```bash
   psql -h localhost -U your_user -d your_db -f sql-scripts/setup.sql
   ```
-- Alternatively, the services will fall back to an in-memory SQLite database if environment variables are not set.
+- Alternatively, the services will fall back to SQLite/embedded storage if PostgreSQL is not configured.
 
 Simple checks:
-1. HTTP introspection (gateway):
+1. HTTP health check (gateway):
+   - `curl -s http://localhost:4000/health`
+
+2. HTTP introspection (gateway):
    - `curl -X POST -H "Content-Type: application/json" --data '{"query":"{ __schema { types { name } } }"}' http://localhost:4000/graphql`
 
-2. Verify `_service.sdl` per subgraph (to ensure federation fields are exposed):
+3. Verify `_service.sdl` on a subgraph (to ensure federation is exposed):
    - `curl -s -X POST -H 'Content-Type: application/json' --data '{"query":"{ _service { sdl } }"}' http://localhost:4001/graphql | jq .`
 
 Subscription verification (Node.js client using `graphql-ws`):
@@ -40,27 +43,18 @@ Subscription verification (Node.js client using `graphql-ws`):
      webSocketImpl: WebSocket,
    });
 
-   (async () => {
-     const onNext = (data) => console.log('Received', JSON.stringify(data, null, 2));
+   const onNext = (data) => console.log('Received', JSON.stringify(data, null, 2));
 
-     console.log('Starting subscription...');
-     const dispose = client.subscribe(
-       {
-         query: `subscription OnPostCreated { postCreated { id title content userId } }`,
-       },
-       {
-         next: onNext,
-         error: (err) => console.error('Err', err),
-         complete: () => console.log('Completed'),
-       }
-     );
-
-     // To test User registration:
-     // query: `subscription OnUserRegistered { userRegistered { id name email } }`
-     
-     // To test Feed creation:
-     // query: `subscription OnFeedCreated { feedCreated { id title body userId } }`
-   })();
+   client.subscribe(
+     {
+       query: `subscription OnPostCreated { postCreated { id title content userId } }`,
+     },
+     {
+       next: onNext,
+       error: (err) => console.error('Err', err),
+       complete: () => console.log('Completed'),
+     }
+   );
    ```
 
 3. Run the subscriber:
@@ -70,13 +64,12 @@ Subscription verification (Node.js client using `graphql-ws`):
 
 4. In another terminal, trigger a mutation via the Gateway (port 4000):
    ```bash
-   # Create a post
    curl -X POST -H "Content-Type: application/json" --data '{"query":"mutation { createPost(title:\"hello\", content:\"world\", userId:1){ id title } }"}' http://localhost:4000/graphql
    ```
 
 If the subscription prints the new post, end-to-end subscription is working through the gateway.
 
 Troubleshooting tips:
-- ERR_PACKAGE_PATH_NOT_EXPORTED: If you encounter this error, ensure your import is `require('graphql-ws/use/ws')` or check the latest `graphql-ws` documentation for ESM/CJS export changes.
-- Port Conflict: Use `lsof -i :4000` to check if the port is already in use.
-- Redis Connection: Ensure all services show "Redis connected" in their logs.
+- Port Conflict: Use `lsof -i :4000` to check whether the gateway port is already in use.
+- Redis Connection: Ensure the services can connect to Redis and that `REDIS_URL` or `REDIS_HOST`/`REDIS_PORT` are configured correctly.
+- Secure WebSocket: If using TLS, connect with `wss://localhost:4000/graphql` and confirm `SSL_KEY_PATH` and `SSL_CERT_PATH` are set.

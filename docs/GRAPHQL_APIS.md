@@ -10,7 +10,7 @@ This document lists the GraphQL APIs exposed by each subgraph and the gateway.
 
 The gateway composes the `user`, `post`, and `feed` subgraphs using Apollo Federation.
 
-> Use `wss://` when connecting from a secure browser origin such as Apollo Studio. Set `SSL_KEY_PATH` and `SSL_CERT_PATH` in the gateway environment to enable TLS.
+> Use `wss://` when connecting from a secure browser origin. Set `SSL_KEY_PATH` and `SSL_CERT_PATH` in the gateway environment to enable TLS, which also enables secure WebSocket transport.
 
 ## User Service (subgraph)
 
@@ -23,10 +23,10 @@ Types and operations:
 - Queries:
   - `user(id: ID!): User`
   - `users(first: Int!, after: String): UserConnection` (cursor pagination)
-  - `allUsers: [User!]!` (non-paginated)
+  - `allUsers: [User!]!`
 - Mutations:
-  - `register(...) : String` (returns token)
-  - `login(email, password) : String` (returns token)
+  - `register(name: String!, email: String!, password: String!): String`
+  - `login(email: String!, password: String!): String`
 - Subscriptions:
   - `userRegistered: User`
 
@@ -56,7 +56,7 @@ Types and operations:
   - `allPosts: [Post!]!`
   - `postsByUser(userId: ID!, first: Int!, after: String): PostConnection`
 - Mutations:
-  - `createPost(title, content, userId): Post`
+  - `createPost(title: String!, content: String!, userId: Int!): Post`
 - Subscriptions:
   - `postCreated: Post`
 
@@ -73,11 +73,12 @@ Types and operations:
   - `feeds(first: Int!, after: String): FeedConnection` (cursor pagination)
   - `allFeeds: [Feed!]!`
 - Mutations:
-  - `createFeed(title, body, userId): Feed`
+  - `createFeed(title: String!, body: String, userId: ID!): Feed`
 - Subscriptions:
   - `feedCreated: Feed`
 
 ## Notes
 
-- Non-paginated `allUsers`, `allPosts`, `allFeeds` exist for convenience. Consider adding server-side limits in production to prevent huge payloads.
+- Non-paginated `allUsers`, `allPosts`, and `allFeeds` exist for convenience. In production, apply limits to avoid large payloads.
 - Subscriptions use Redis-based `RedisPubSub` to propagate events between instances.
+- The project uses `graphql-ws/use/ws` for GraphQL WebSocket transport in the current CommonJS service setup.
