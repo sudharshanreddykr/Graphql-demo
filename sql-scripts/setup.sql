@@ -1,0 +1,58 @@
+-- Database Setup and Seeding Script for Graphql-demo
+
+-- 1. Users Table (user-service)
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Posts Table (post-service)
+CREATE TABLE IF NOT EXISTS posts (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Feeds Table (feed-service)
+CREATE TABLE IF NOT EXISTS feeds (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    body TEXT,
+    "userId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ensure defaults exist even if tables were already created by Sequelize
+ALTER TABLE users ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE users ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE posts ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE posts ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE feeds ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE feeds ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
+
+-- SEED DATA
+-- Seed Users
+INSERT INTO users (name, email, password, "createdAt", "updatedAt") VALUES 
+('Alice', 'alice@example.com', '$2a$10$X7lM9i0xN/H0f3Uv/8yv7.WzU6M1g7M6zV8L2iI/8GqN0R5eS9Qe', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Bob', 'bob@example.com', '$2a$10$X7lM9i0xN/H0f3Uv/8yv7.WzU6M1g7M6zV8L2iI/8GqN0R5eS9Qe', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Carol', 'carol@example.com', '$2a$10$X7lM9i0xN/H0f3Uv/8yv7.WzU6M1g7M6zV8L2iI/8GqN0R5eS9Qe', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+ON CONFLICT (email) DO NOTHING;
+
+-- Seed Posts
+INSERT INTO posts (title, content, "userId", "createdAt", "updatedAt") VALUES 
+('Hello World', 'First post', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Second Post', 'Another post', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Bob Post', 'Bob lives here', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+-- Seed Feeds
+INSERT INTO feeds (title, body, "userId", "createdAt", "updatedAt") VALUES 
+('Feed One', 'Hello feed 1', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Feed Two', 'Hello feed 2', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

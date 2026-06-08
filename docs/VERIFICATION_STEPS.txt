@@ -1,0 +1,76 @@
+Verification steps for subscriptions and general checks
+
+Prerequisites:
+- Ensure Redis is running and reachable at the configured `REDIS_HOST`/`REDIS_PORT`.
+- Ensure the gateway and all subgraphs are running:
+  - Gateway: `http://localhost:4000/graphql` (WS: `ws://localhost:4000/graphql` or optional `wss://localhost:4000/graphql`)
+  - User: `http://localhost:4001/graphql` (WS: `ws://localhost:4001/graphql`)
+  - Post: `http://localhost:4002/graphql` (WS: `ws://localhost:4002/graphql`)
+  - Feed: `http://localhost:4003/graphql` (WS: `ws://localhost:4003/graphql`)
+
+- To use secure WebSocket (`wss://`) from Studio, set gateway TLS environment variables:
+  - `SSL_KEY_PATH=/path/to/key.pem`
+  - `SSL_CERT_PATH=/path/to/cert.pem`
+  - optional: `SSL_PASSPHRASE=...`
+
+  Then restart the gateway.
+
+Simple checks:
+1. HTTP introspection (gateway):
+   - `curl -X POST -H "Content-Type: application/json" --data '{"query":"{ __schema { types { name } } }"}' http://localhost:4000/graphql`
+
+2. Verify `_service.sdl` per subgraph (to ensure federation fields are exposed):
+   - `curl -s -X POST -H 'Content-Type: application/json' --data '{"query":"{ _service { sdl } }"}' http://localhost:4001/graphql | jq .`
+
+Subscription verification (Node.js client using `graphql-ws`):
+
+1. Install the client (from repo root or a temp folder):
+   ```bash
+   npm init -y
+   npm install graphql-ws ws
+   ```
+
+2. Create `subscribe.js` with the following content:
+   ```js
+   const { createClient } = require('graphql-ws');
+   const WebSocket = require('ws');
+
+   const client = createClient({
+     url: 'wss://localhost:4000/graphql',
+     webSocketImpl: WebSocket,
+   });
+
+   (async () => {
+     const onNext = (data) => console.log('Received', JSON.stringify(data, null, 2));
+
+     const dispose = client.subscribe(
+       {
+         query: `subscription OnPostCreated { postCreated { id title content userId } }`,
+       },
+       {
+         next: onNext,
+         error: (err) => console.error('Err', err),
+         complete: () => console.log('Completed'),
+       }
+     );
+
+     // Keep running; in another terminal trigger a mutation to create a post
+   })();
+   ```
+
+3. Run the subscriber:
+   ```bash
+   node subscribe.js
+   ```
+
+4. In another terminal, send a `createPost` mutation via HTTP (gateway or direct subgraph):
+   ```bash
+   curl -X POST -H "Content-Type: application/json" --data '{"query":"mutation { createPost(title:\"hello\", content:\"world\", userId:1){ id title } }"}' http://localhost:4002/graphql
+   ```
+
+If the subscription prints the new post, end-to-end subscription is working through the gateway proxy.
+
+Troubleshooting tips:
+- If you see no events: ensure Redis is connected (check service logs), and that the mutation publishes using `pubsub.publish(...)`.
+- If you get protocol errors: ensure the client uses `graphql-ws` protocol (Apollo Studio uses this by default when given a `ws://` URL).
+- If using Apollo Studio and subscriptions fail: check browser permissions for localhost websockets and try the Node client above to isolate issues.
