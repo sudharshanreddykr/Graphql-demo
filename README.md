@@ -22,9 +22,9 @@ User Service      Post Service     Feed Service
   PostgreSQL        PostgreSQL       PostgreSQL
 ```
 
-- **Federated Gateway**: Composes subgraphs into a single schema. Supports HTTP and WebSockets (Subscriptions).
+- **Federated Gateway**: Composes subgraphs into a single schema and supports queries/mutations over HTTP only.
 - **Subgraphs**: Independent microservices for Users, Posts, and Feeds.
-- **Subscriptions**: Real-time updates using GraphQL Subscriptions over WebSockets, backed by Redis PubSub.
+- **Subscriptions**: Real-time updates are available directly from the subgraph WebSocket endpoints, backed by Redis PubSub.
 - **Persistence**: PostgreSQL for production/staging, with an in-memory SQLite fallback for rapid development.
 - **Caching**: Redis is used for object caching and as a PubSub transport.
 - **Resilience**: Rate limiting and Circuit Breakers implemented at the Gateway.
@@ -32,11 +32,13 @@ User Service      Post Service     Feed Service
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js (v18+)
 - PostgreSQL (or use the SQLite fallback)
 - Redis
 
 ### Installation
+
 1. Clone the repository.
 2. Install dependencies for each service:
    ```bash
@@ -47,24 +49,34 @@ User Service      Post Service     Feed Service
    ```
 
 ### Database Setup
+
 A standalone SQL script is provided for setting up the PostgreSQL schema and seed data.
 **Path:** `sql-scripts/setup.sql`
 
 You can run it using `psql`:
+
 ```bash
 psql -h localhost -U your_user -d your_db -f sql-scripts/setup.sql
 ```
 
 ### Running the Services
+
 Start each service in a separate terminal:
+
 ```bash
 npm run dev # in each service directory
 ```
 
 ## GraphQL Subscriptions
-The Gateway provides a unified WebSocket endpoint at `ws://localhost:4000/graphql`.
+
+Subscriptions are available directly from each subgraph's WebSocket endpoint:
+
+- `ws://localhost:4001/graphql` for User Service
+- `ws://localhost:4002/graphql` for Post Service
+- `ws://localhost:4003/graphql` for Feed Service
 
 Available subscriptions:
+
 - `userRegistered` (User Service)
 - `postCreated` (Post Service)
 - `feedCreated` (Feed Service)

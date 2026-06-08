@@ -12,7 +12,7 @@ Overview:
 - Subscriptions are implemented locally in each subgraph using `graphql-ws` and `ws`.
 - Redis is used as the pub/sub transport via `graphql-redis-subscriptions` so that published events propagate across instances.
 - The gateway composes subgraphs via `IntrospectAndCompose`, and it now polls the subgraphs periodically so schema changes refresh automatically.
-- For subscriptions, the gateway uses `graphql-ws` and the Apollo Gateway `executor` to route subscription requests to the appropriate subgraphs. This provides a unified subscription endpoint at `ws://localhost:4000/graphql`.
+- Subscriptions are handled directly by each subgraph over their own WebSocket endpoints. The gateway does not proxy subscription execution.
 
 Resilience & Observability:
 
@@ -27,10 +27,9 @@ Flow (high-level):
    - Gateway composes supergraph and forwards sub-requests to subgraphs using `RemoteGraphQLDataSource`.
    - Gateway attaches `x-trace-id` and logs the request.
 
-2. Client -> Gateway WS `ws://localhost:4000/graphql` (subscription):
-   - Gateway handles the WebSocket connection using `graphql-ws`.
-   - Requests are routed to subgraphs via the Gateway `executor`.
-   - Subgraph `graphql-ws` servers handle the local subscription and use `RedisPubSub` to deliver events.
+2. Client -> Subgraph WS `ws://localhost:4001/graphql` or `ws://localhost:4002/graphql` or `ws://localhost:4003/graphql` (subscription):
+   - Subgraphs handle the WebSocket connection using `graphql-ws`.
+   - Subscription operations are resolved locally in the subgraph and use `RedisPubSub` to deliver events.
 
 3. Subgraph publishes an event (e.g., `pubsub.publish('POST_CREATED', { postCreated: post })`):
    - RedisPubSub broadcasts to all subscribers across services.

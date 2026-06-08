@@ -16,9 +16,6 @@ const { createServer } = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const WebSocket = require("ws");
-const { WebSocketServer } = WebSocket;
-const { useServer } = require("graphql-ws/use/ws");
 
 const logger = require("./utils/logger");
 
@@ -87,6 +84,13 @@ class CircuitBreakerDataSource extends RemoteGraphQLDataSource {
     this.breaker.on("close", () =>
       logger.info(`Circuit closed for ${name}`, { url }),
     );
+  }
+
+  willSendRequest({ request, requestContext }) {
+    const traceId = requestContext?.request?.http?.headers.get("x-trace-id");
+    if (traceId) {
+      request.http.headers.set("x-trace-id", traceId);
+    }
   }
 
   async process(request, requestContext) {
@@ -204,6 +208,7 @@ async function start() {
     const traceId = req.headers["x-trace-id"] || uuidv4();
     req.traceId = traceId;
     req.logger = logger.child ? logger.child({ traceId }) : logger;
+    req.headers["x-trace-id"] = traceId;
     res.setHeader("x-trace-id", traceId);
     req.logger.info(`incoming request ${req.method} ${req.path}`);
     next();
@@ -247,7 +252,7 @@ async function start() {
   await server.start();
   app.use("/graphql", expressMiddleware(server));
 
-  // Create an HTTP server so we can attach a WebSocket server for subscriptions
+  // Create an HTTP server for gateway HTTP traffic only
   const httpServer = USE_HTTPS
     ? https.createServer(
         {
@@ -259,37 +264,10 @@ async function start() {
       )
     : createServer(app);
 
-  const wsServer = new WebSocketServer({
-    server: httpServer,
-    path: "/graphql",
-  });
-
-  // Use the gateway schema and executor (already loaded by ApolloServer)
-  const schema = gateway.schema;
-  const executor = gateway.executor;
-
-  useServer(
-    {
-      schema,
-      execute: executor,
-      subscribe: executor,
-      onConnect: (ctx) => {
-        logger.info("WS Connected", {
-          traceId: ctx.connectionParams?.["x-trace-id"] || "new-ws-conn",
-        });
-      },
-    },
-    wsServer,
-  );
-
   const protocol = USE_HTTPS ? "https" : "http";
-  const wsProtocol = USE_HTTPS ? "wss" : "ws";
 
   httpServer.listen(PORT, () => {
     logger.info(`Gateway Running On ${protocol}://localhost:${PORT}`);
-    logger.info(
-      `Gateway WebSocket endpoint available at ${wsProtocol}://localhost:${PORT}/graphql`,
-    );
   });
 }
 
